@@ -1,0 +1,79 @@
+#include <WiFi.h>
+#include <HTTPClient.h>
+
+// WiFi da sua casa (para conectar na internet!)
+const char* ssid = "TROCAR";          // ← MUDE AQUI
+const char* password = "TROCAR";     // ← MUDE AQUI
+
+// ThingSpeak
+const char* serverName = "http://api.thingspeak.com/update";
+String apiKey = "";         // ← COLE O KEY AQUI
+
+// Sensor
+const int sensorPin = 34;
+
+void setup() {
+  Serial.begin(115200);
+  delay(1000);
+
+  pinMode(sensorPin, INPUT);
+
+  Serial.println("\n=== Plant Monitor - ThingSpeak ===");
+
+  WiFi.begin(ssid, password);
+  Serial.print("Connecting to WiFi");
+
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(500);
+    Serial.print(".");
+  }
+
+  Serial.println();
+  Serial.println("WiFi connected!");
+  Serial.print("IP address: ");
+  Serial.println(WiFi.localIP());
+  Serial.println("==================================\n");
+}
+
+void loop() {
+  int moistureRaw = analogRead(sensorPin);
+  int moisturePercent = map(moistureRaw, 4095, 0, 0, 100);
+
+  if (moisturePercent < 0) moisturePercent = 0;
+  if (moisturePercent > 100) moisturePercent = 100;
+
+  Serial.print("Moisture: ");
+  Serial.print(moisturePercent);
+  Serial.print("% (Raw: ");
+  Serial.print(moistureRaw);
+  Serial.println(")");
+
+  if (WiFi.status() == WL_CONNECTED) {
+    HTTPClient http;
+
+    String url = serverName;
+    url += "?api_key=" + apiKey;
+    url += "&field1=" + String(moisturePercent);
+    url += "&field2=" + String(moistureRaw);
+
+    http.begin(url);
+    int httpResponseCode = http.GET();
+
+    if (httpResponseCode > 0) {
+      Serial.print("ThingSpeak response: ");
+      Serial.println(httpResponseCode);
+      Serial.println("Data sent to cloud! ✅");
+    } else {
+      Serial.print("Error sending data: ");
+      Serial.println(httpResponseCode);
+    }
+
+    http.end();
+  } else {
+    Serial.println("WiFi disconnected!");
+  }
+
+  Serial.println("---");
+
+  delay(20000); // 20 segundos
+}
